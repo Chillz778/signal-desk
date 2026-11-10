@@ -19,7 +19,10 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("Signal Desk", page.text)
         self.assertEqual(script.status_code, 200)
-        self.assertIn("loadStrategies", script.text)
+        self.assertIn("runManualScan", script.text)
+        self.assertIn('id="run-scan"', page.text)
+        self.assertNotIn('id="strategy-rows"', page.text)
+        self.assertNotIn('id="validation-form"', page.text)
         self.assertEqual(stylesheet.status_code, 200)
         self.assertIn("--bg:", stylesheet.text)
 

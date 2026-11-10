@@ -2,12 +2,6 @@
   "use strict";
 
   const INSTRUMENTS = ["BTCUSD", "EURUSD", "XAUUSD", "GBPUSD"];
-  const STRATEGIES = [
-    ["trend_following", "Trend following"],
-    ["liquidity_sweep_mss", "Liquidity sweep + MSS"],
-    ["breakout_retest", "Breakout retest"],
-    ["range_mean_reversion", "Range mean reversion"],
-  ];
   const DISPLAY_NAMES = { BTCUSD: "BTC / USD", EURUSD: "EUR / USD", XAUUSD: "XAU / USD", GBPUSD: "GBP / USD" };
   const TIMEFRAME_NAMES = { "1h": "1H", "4h": "4H", "1day": "1D" };
   const state = { instrument: "BTCUSD", timeframe: "1h", candles: [], quality: null, loading: false };
@@ -231,7 +225,13 @@
       const workerText = worker.last_scan_at ? `${niceStatus(worker.status)} · ${formatDate(worker.last_scan_at)}` : niceStatus(worker.status || "not_configured");
       setDot("worker-dot", workerKind, "worker-status", workerText);
       const telegram = worker.telegram_status || "not_configured";
-      setDot("telegram-dot", telegram === "healthy" || telegram === "ready" ? "ok" : "warn", "telegram-status", niceStatus(telegram));
+      const websiteTelegramReady = health.telegram_configured_on_website === true;
+      setDot(
+        "telegram-dot",
+        websiteTelegramReady || telegram === "healthy" ? "ok" : "warn",
+        "telegram-status",
+        websiteTelegramReady ? "Ready" : telegram === "healthy" ? "Scheduled worker ready" : "Add to website host",
+      );
       el("last-updated").textContent = `System checked ${formatDate(new Date().toISOString())}`;
     } catch (error) {
       setDot("api-dot", "bad", "api-status", "Unavailable");
@@ -240,53 +240,6 @@
       setDot("worker-dot", "warn", "worker-status", "Waiting for scan");
       setDot("telegram-dot", "warn", "telegram-status", "Not checked");
       el("last-updated").textContent = "Could not reach the API";
-    }
-  }
-
-  function stateBadge(entry) {
-    const status = entry?.status || "testing";
-    const forward = entry?.forward_summary || {};
-    const comparison = forward.historical_comparison_status;
-    const span = document.createElement("span");
-    span.className = `state-badge ${status}`;
-    const labels = {
-      testing: "Alerts enabled",
-      historical_pass_forward_test_required: "Alerts on · monitoring",
-      approved_for_live: "Alerts on · history checked",
-      suspended: "Drift noted · alerts on",
-      historical_rejected: "History failed · alerts on",
-      insufficient_data: "Needs data · alerts on",
-    };
-    span.textContent = labels[status] || niceStatus(status);
-    if (comparison === "suspended" && status === "testing") span.textContent = "Drift noted · alerts on";
-    if (comparison === "approved_for_live" && status === "testing") span.textContent = "Forward checks pass · alerts on";
-    const outcomes = forward.live_signal_outcomes?.trade_count ?? 0;
-    const reasons = (forward.monitoring_reasons || []).join(", ");
-    span.title = `Research status: ${niceStatus(status)}. Forward comparison: ${comparison || "not compared"}; ${outcomes} completed outcomes${reasons ? `; ${reasons}` : ""}. Signal alerts remain enabled.`;
-    return span;
-  }
-
-  async function loadStrategies() {
-    const body = el("strategy-rows");
-    try {
-      const response = await request("/api/v1/strategies/status");
-      const byKey = new Map((response.items || []).map((item) => [`${item.instrument}|${item.strategy}`, item]));
-      body.replaceChildren();
-      INSTRUMENTS.forEach((instrument) => {
-        const row = document.createElement("tr");
-        const market = document.createElement("td");
-        market.textContent = DISPLAY_NAMES[instrument];
-        row.append(market);
-        STRATEGIES.forEach(([key]) => {
-          const cell = document.createElement("td");
-          const entry = byKey.get(`${instrument}|${key}`);
-          cell.append(stateBadge(entry));
-          row.append(cell);
-        });
-        body.append(row);
-      });
-    } catch (_) {
-      body.innerHTML = '<tr><td colspan="5" class="table-empty">Strategy status is unavailable until the API and application state are ready.</td></tr>';
     }
   }
 
@@ -351,119 +304,48 @@
     }
   }
 
-  function renderMetricsCard(title, window, passed) {
-    const metrics = window?.metrics || {};
-    const card = document.createElement("section");
-    card.className = "result-card";
-    const heading = document.createElement("h4");
-    heading.textContent = `${title} · ${passed === true ? "PASS" : passed === false ? "REJECT" : "MORE DATA NEEDED"}`;
-    card.append(heading);
-    const values = [
-      ["Trades", metrics.trade_count ?? 0],
-      ["Win rate", `${Number(metrics.win_rate_percent || 0).toFixed(1)}%`],
-      ["Profit factor", metrics.profit_factor == null ? "—" : Number(metrics.profit_factor).toFixed(2)],
-      ["Max drawdown", `${Number(metrics.maximum_drawdown_percent || 0).toFixed(1)}%`],
-    ];
-    const grid = document.createElement("div");
-    grid.className = "result-metrics";
-    values.forEach(([label, value]) => {
-      const item = document.createElement("span");
-      item.textContent = label;
-      const strong = document.createElement("b");
-      strong.textContent = value;
-      item.append(strong);
-      grid.append(item);
-    });
-    card.append(grid);
-    return card;
+  const sleep = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+  async function waitForScan(scanId) {
+    const started = Date.now();
+    while (Date.now() - started < 180_000) {
+      await sleep(3500);
+      const current = await request(`/api/v1/scanner/run/${encodeURIComponent(scanId)}`);
+      if (current.status !== "starting" && current.status !== "running") return current;
+      el("scan-feedback").textContent = "Scanning all markets and strategies. This can take about two minutes on the free data plan…";
+    }
+    throw new Error("The scan is taking longer than expected. Refresh the dashboard to check its status.");
   }
 
-  function renderValidation(data) {
-    const result = el("validation-result");
-    result.hidden = false;
-    result.replaceChildren();
-    const validation = data.validation;
-    const passed = validation.status === "historical_pass_forward_test_required";
-    const insufficient = validation.status === "insufficient_data";
-    const banner = document.createElement("div");
-    banner.className = "result-banner";
-    const symbol = document.createElement("span");
-    symbol.className = `result-symbol ${passed ? "" : insufficient ? "insufficient" : "rejected"}`;
-    symbol.textContent = passed ? "✓" : insufficient ? "…" : "!";
-    const text = document.createElement("div");
-    const title = document.createElement("h3");
-    title.textContent = passed ? "Historical gates passed" : insufficient ? "More historical evidence needed" : "Historical gates did not pass";
-    const subtitle = document.createElement("p");
-    subtitle.textContent = `${DISPLAY_NAMES[data.instrument]} · ${niceStatus(data.strategy)} v${data.strategy_version} · informational only; alerts stay enabled`;
-    text.append(title, subtitle);
-    banner.append(symbol, text);
-    const cards = document.createElement("div");
-    cards.className = "result-grid";
-    cards.append(
-      renderMetricsCard("In sample", validation.in_sample, validation.in_sample?.passed),
-      renderMetricsCard("Out of sample", validation.out_of_sample, validation.out_of_sample?.passed),
-      renderMetricsCard("Walk forward", { metrics: { trade_count: (validation.walk_forward.windows || []).reduce((sum, item) => sum + (item.metrics?.trade_count || 0), 0), win_rate_percent: averageMetric(validation.walk_forward.windows, "win_rate_percent"), profit_factor: averageMetric(validation.walk_forward.windows, "profit_factor"), maximum_drawdown_percent: Math.max(0, ...(validation.walk_forward.windows || []).map((item) => item.metrics?.maximum_drawdown_percent || 0)) } }, validation.walk_forward.passed),
-    );
-    const reasons = [...(validation.in_sample?.reasons || []), ...(validation.out_of_sample?.reasons || []), ...(validation.walk_forward.windows || []).flatMap((window) => window.reasons || [])];
-    const uniqueReasons = [...new Set(reasons)];
-    if (uniqueReasons.length) {
-      const reasonLine = document.createElement("p");
-      reasonLine.className = "result-reasons";
-      reasonLine.textContent = `Gate notes: ${uniqueReasons.map(niceStatus).join(" · ")}`;
-      result.append(banner, cards, reasonLine);
-    } else result.append(banner, cards);
-    const note = document.createElement("p");
-    note.className = "disclaimer";
-    note.textContent = `This report does not turn alerts on or off. Compact summary saved: ${data.validation_summary_persisted ? "yes" : "no"}. Historical results are informational and never guarantee future performance.`;
-    result.append(note);
-  }
-
-  function averageMetric(windows, key) {
-    const values = (windows || []).map((window) => window.metrics?.[key]).filter((value) => Number.isFinite(value));
-    if (!values.length) return null;
-    if (key === "maximum_drawdown_percent") return Math.max(...values);
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }
-
-  async function runValidation(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    const formData = new FormData(form);
-    const payload = {
-      instrument_code: String(formData.get("instrument_code")),
-      strategy: String(formData.get("strategy")),
-      hourly_candle_count: Number(formData.get("hourly_candle_count")),
-      initial_equity: Number(formData.get("initial_equity")),
-      risk_fraction: Number(formData.get("risk_percent")) / 100,
-      spread_bps: Number(formData.get("spread_bps")),
-      slippage_bps: Number(formData.get("slippage_bps")),
-      commission_bps_per_side: Number(formData.get("commission_bps_per_side")),
-      minimum_reward_risk: Number(formData.get("minimum_reward_risk")),
-    };
-    const button = el("validate-button");
-    const result = el("validation-result");
+  async function runManualScan() {
+    const button = el("run-scan");
+    const feedback = el("scan-feedback");
     button.disabled = true;
-    button.textContent = "Running in-memory checks…";
-    result.hidden = false;
-    result.replaceChildren();
-    const progress = document.createElement("p");
-    progress.className = "form-hint";
-    progress.textContent = "Fetching closed market history and running chronological checks. This may take a little while.";
-    result.append(progress);
+    button.textContent = "Starting scan…";
+    feedback.textContent = "Starting a scan of every market and strategy…";
     try {
-      const data = await request("/api/v1/research/validate", { method: "POST", body: JSON.stringify(payload) });
-      renderValidation(data);
-      loadStrategies();
-      result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const started = await request("/api/v1/scanner/run", { method: "POST", body: "{}" });
+      const completed = await waitForScan(started.scan_id);
+      if (completed.status === "already_running") {
+        feedback.textContent = "A scheduled scan is already running. The hourly schedule is still active.";
+      } else if (completed.status === "failed") {
+        feedback.textContent = "The scan could not finish. Check the system status above and try again later.";
+      } else {
+        const result = completed.result || {};
+        const created = Number(result.signals_created || 0);
+        const sent = Number(result.alerts_sent || 0);
+        const parts = [`Scan finished across ${result.scanned_instruments || 0} markets`, `${created} new signal${created === 1 ? "" : "s"}`, `${sent} Telegram alert${sent === 1 ? "" : "s"} sent`];
+        if (result.telegram_status === "not_configured") parts.push("Telegram is not configured on this website host");
+        if (result.alerts_failed) parts.push(`${result.alerts_failed} Telegram delivery failure${result.alerts_failed === 1 ? "" : "s"}`);
+        if (result.worker_status === "degraded") parts.push("some market data was unavailable");
+        feedback.textContent = created === 0 ? `Scan finished. No setup met its rules; no signal was forced. ${parts.slice(0, 1).join("")}.` : parts.join(" · ");
+      }
     } catch (error) {
-      const box = document.createElement("div");
-      box.className = "validation-error";
-      box.textContent = error.message;
-      result.replaceChildren(box);
+      feedback.textContent = error.message;
     } finally {
       button.disabled = false;
-      button.innerHTML = 'Run historical validation <span aria-hidden="true">→</span>';
+      button.textContent = "Run scan now";
+      await Promise.all([loadSystem(), loadSignals()]);
     }
   }
 
@@ -485,16 +367,14 @@
   });
   el("refresh-all").addEventListener("click", () => {
     loadSystem();
-    loadStrategies();
     loadSignals();
     INSTRUMENTS.forEach(loadMarketCard);
     loadChart();
   });
-  el("validation-form").addEventListener("submit", runValidation);
+  el("run-scan").addEventListener("click", runManualScan);
   window.addEventListener("resize", () => renderChart(state.candles));
 
   loadSystem();
-  loadStrategies();
   loadSignals();
   INSTRUMENTS.forEach(loadMarketCard);
   loadChart();

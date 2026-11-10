@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b1013" />
-    <title>Signal Desk — Trading Research</title>
+    <title>Signal Desk — Market Signals</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="/dashboard.js" defer></script>
   </head>
@@ -13,10 +13,11 @@
       <header class="topbar">
         <a class="brand" href="#top" aria-label="Signal Desk home">
           <span class="brand-mark" aria-hidden="true">S</span>
-          <span><strong>Signal Desk</strong><small>PERSONAL TRADING INTELLIGENCE</small></span>
+          <span><strong>Signal Desk</strong><small>PERSONAL MARKET SIGNALS</small></span>
         </a>
         <div class="topbar-right">
-          <span class="research-pill"><span></span> RESEARCH ONLY</span>
+          <span class="research-pill"><span></span> SIGNALS · NO ORDERS</span>
+          <button class="primary-button scan-button" id="run-scan" type="button">Run scan now</button>
           <button class="icon-button" id="refresh-all" type="button" aria-label="Refresh dashboard" title="Refresh dashboard">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 9A6.5 6.5 0 0 1 17 6.5L20 12M4 12l3 5.5A6.5 6.5 0 0 0 18 15"/></svg>
           </button>
@@ -26,9 +27,10 @@
       <main id="top">
         <section class="welcome-row">
           <div>
-            <div class="eyebrow">PERSONAL RESEARCH TERMINAL</div>
+            <div class="eyebrow">MARKET WATCH</div>
             <h1>Market overview</h1>
             <p class="muted">Clear rules. Patient signals. No forced trades.</p>
+            <p class="scan-feedback" id="scan-feedback" role="status" aria-live="polite">Automatic scans run hourly. Run one manually whenever you need it.</p>
           </div>
           <div class="updated" id="last-updated">Waiting for system status…</div>
         </section>
@@ -85,38 +87,8 @@
           </article>
         </section>
 
-        <section class="panel strategy-panel">
-          <div class="panel-heading strategy-heading">
-            <div><div class="eyebrow">INDEPENDENT RULE SETS</div><h2>Strategy monitoring</h2><p class="muted">Alerts are sent when a strategy's own setup and risk rules pass. Historical and forward results are informational and do not block alerts.</p></div>
-            <div class="status-legend"><span><i class="legend-dot testing"></i> Alerts enabled</span><span><i class="legend-dot forward"></i> Results monitored</span><span><i class="legend-dot live"></i> Historical results</span><span><i class="legend-dot suspended"></i> Drift noted</span></div>
-          </div>
-          <div class="table-scroll"><table class="strategy-table"><thead><tr><th>Market</th><th>Trend following</th><th>Liquidity sweep + MSS</th><th>Breakout retest</th><th>Range mean reversion</th></tr></thead><tbody id="strategy-rows"><tr><td colspan="5" class="table-empty">Loading strategy states…</td></tr></tbody></table></div>
-          <div class="storage-note"><span class="note-icon">i</span><span>The hourly scanner checks every strategy and market. Alerts go out on a valid setup and risk check; they never place orders. When broker costs are unavailable, the 2:1 reward/risk filter uses the gross plan, before costs.</span></div>
-        </section>
-
-        <section class="panel validation-panel" id="validate">
-          <div class="panel-heading validation-title">
-            <div><div class="eyebrow">OPTIONAL HISTORICAL RESEARCH</div><h2>Validate a strategy</h2><p class="muted">Chronological in-sample, out-of-sample, and walk-forward metrics. These checks do not turn alerts on or off.</p></div>
-            <span class="no-guarantee">Past performance does not guarantee future results</span>
-          </div>
-          <form id="validation-form">
-            <div class="form-grid">
-              <label>Market<select name="instrument_code"><option value="BTCUSD">BTC / USD</option><option value="EURUSD">EUR / USD</option><option value="XAUUSD">XAU / USD</option><option value="GBPUSD">GBP / USD</option></select></label>
-              <label>Strategy<select name="strategy"><option value="trend_following">Trend following</option><option value="liquidity_sweep_mss">Liquidity sweep + MSS</option><option value="breakout_retest">Breakout retest</option><option value="range_mean_reversion">Range mean reversion</option></select></label>
-              <label>Starting account value<input name="initial_equity" type="number" min="0.01" step="any" placeholder="Enter your own amount" required /></label>
-              <label>Risk per trade (%)<input name="risk_percent" type="number" min="0.01" max="100" step="any" placeholder="e.g. 1" required /></label>
-              <label>Spread (basis points)<input name="spread_bps" type="number" min="0" step="any" placeholder="Use your broker estimate" required /></label>
-              <label>Slippage (basis points)<input name="slippage_bps" type="number" min="0" step="any" placeholder="Use a conservative estimate" required /></label>
-              <label>Commission per side (basis points)<input name="commission_bps_per_side" type="number" min="0" step="any" placeholder="Enter 0 only if truly free" required /></label>
-              <label>Minimum net reward / risk<input name="minimum_reward_risk" type="number" min="0" step="any" value="2" required /></label>
-              <label class="wide-field">Historical candles<input name="hourly_candle_count" type="number" min="120" max="5000" step="1" value="1000" required /><small>Longer ranges may use more free data credits. Test one market and strategy at a time.</small></label>
-            </div>
-            <div class="form-actions"><p class="form-hint">This makes read-only research requests. No trade is placed. Nothing is saved unless compact summary persistence is connected.</p><button class="primary-button" id="validate-button" type="submit">Run historical validation <span aria-hidden="true">→</span></button></div>
-          </form>
-          <div id="validation-result" class="validation-result" aria-live="polite" hidden></div>
-        </section>
       </main>
-      <footer><span>Signal Desk <span class="footer-sep">·</span> UTC timestamps</span><span>Research tools only · no brokerage connection or order execution</span></footer>
+      <footer><span>Signal Desk <span class="footer-sep">·</span> UTC timestamps</span><span>Signal alerts only · no brokerage connection or order execution</span></footer>
     </div>
   </body>
 </html>

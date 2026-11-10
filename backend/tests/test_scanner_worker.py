@@ -58,6 +58,9 @@ class FakeStore:
     async def upsert_worker_health(self, record):
         self.health.append(record)
 
+    async def get_worker_health(self):
+        return self.health[-1] if self.health else None
+
     async def list_strategy_statuses(self):
         return self.statuses
 

@@ -11,7 +11,7 @@ The principles behind the system are deliberate: each strategy has its own exact
 - **Backtesting and validation:** Causal, in-memory simulation uses completed candles, explicit spreads/slippage/commission, next-candle entries, stop-first handling when an OHLC candle touches stop and target, 70/30 chronological splits, and walk-forward windows.
 - **Signal lifecycle and forward monitoring:** The hourly scanner sends an alert on detection, then tracks entry, expiry, partial targets, stop, and later outcomes. Strategy-specific confirmation, data-quality checks, and reward/risk filters still apply.
 - **Performance monitoring:** Forward outcomes are compared with out-of-sample historical expectancy and profit factor when both are available. Historical and forward results are informational and never suppress alerts.
-- **Dashboard:** The API serves the dashboard from the same origin. It shows closed-candle charts, provider and worker health, signal lifecycle, strategy readiness, and a historical-validation form.
+- **Dashboard:** The API serves a live dashboard with closed-candle charts, provider and worker health, the recent signal journal, and an on-demand scan button.
 - **Telegram:** Optional alert delivery happens as soon as a strategy's own closed-bar setup and risk rules pass. A scan alerts without historical or forward approval. Alerts are analysis only; there is no order execution or profit guarantee.
 
 ## Storage and privacy
@@ -58,8 +58,9 @@ python -m unittest discover -s backend/tests -v
 1. Start the API, then check that the market-data key is shown as configured.
 2. Select a market and 1H/4H/1D chart. Dashboard chart requests use closed candles. Refreshing the four market tiles makes four small additional data requests.
 3. Apply the Supabase migration to see worker and signal history persist across runs.
-4. In **Validate a strategy**, enter your own account value, risk percentage, and broker cost estimates. Those fields are required because assumed zero costs or an invented account size would make the results misleading. A validation request uses historical data credits.
-5. Historical validation is optional research. The hourly scanner evaluates all configured strategies and sends an alert when one of their own confirmation rules and the reward/risk filter pass. Existing broker cost assumptions are used when configured; otherwise the minimum reward/risk filter uses the gross plan and explicitly marks that broker costs are unknown. Forward outcomes are tracked for comparison but never block alerts.
+4. Use **Run scan now** to trigger an on-demand scan across all four markets and strategies. It checks closed hourly candles and reports when the scan is complete. The scheduled GitHub scan continues to run hourly.
+5. Telegram credentials in GitHub Actions are separate from the Render website environment. To receive Telegram alerts from the on-demand button, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` under the Render service's **Environment** settings. Without them, the button still scans and records signals on the dashboard; the scheduled GitHub scan can continue sending alerts with its repository secrets.
+6. The scanner preserves each strategy's independent confirmation rules, checks data quality, and requires at least 2:1 planned reward/risk. If broker cost assumptions are unavailable, that ratio is gross, before fees. Historical and forward results remain informational and do not block alerts.
 
 A short history or few qualifying setups can produce **Need more data**. That is an intentional outcome, not a reason to lower safeguards blindly.
 

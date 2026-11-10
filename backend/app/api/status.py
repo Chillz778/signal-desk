@@ -27,6 +27,10 @@ async def system_health() -> dict:
             "configured": bool(os.getenv("TWELVE_DATA_API_KEY", "").strip()),
         },
         "persistence": {"configured": store is not None},
+        "telegram_configured_on_website": bool(
+            os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+            and os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        ),
         "worker": {"status": "not_configured", "last_scan_at": None, "next_scan_at": None},
     }
     if store is None:

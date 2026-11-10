@@ -13,6 +13,7 @@ from starlette.responses import PlainTextResponse
 from app.api.market_data import router as market_data_router
 from app.api.research import router as research_router
 from app.api.risk import router as risk_router
+from app.api.scanner import router as scanner_router
 from app.api.signals import router as signals_router
 from app.api.status import router as status_router
 
@@ -57,6 +58,7 @@ app.include_router(market_data_router)
 app.include_router(research_router)
 app.include_router(signals_router)
 app.include_router(risk_router)
+app.include_router(scanner_router)
 app.include_router(status_router)
 
 

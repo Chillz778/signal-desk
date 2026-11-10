@@ -42,6 +42,20 @@ _SIGNAL_UPDATES = (
 )
 
 
+def worker_scan_is_active(health: dict | None, now: datetime | None = None) -> bool:
+    if not health or health.get("status") != "starting":
+        return False
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    value = health.get("last_scan_at") or health.get("updated_at")
+    try:
+        started = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True
+    if started.tzinfo is None or started.utcoffset() is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return current - started.astimezone(timezone.utc) < timedelta(minutes=15)
+
+
 def _context_for(instrument: str, series: dict) -> StrategyContext:
     hourly = series["1h"].candles
     as_of = hourly[-1].timestamp + TIMEFRAME_DURATION["1h"]
@@ -285,6 +299,23 @@ async def scan_once(
             notifier = None
 
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    existing_health = await store.get_worker_health()
+    if worker_scan_is_active(existing_health, current):
+        return {
+            "status": "already_running",
+            "scanned_instruments": 0,
+            "signals_created": 0,
+            "duplicate_candidates_suppressed": 0,
+            "no_setup_evaluations": 0,
+            "alerts_sent": 0,
+            "alerts_failed": 0,
+            "telegram_status": (existing_health or {}).get("telegram_status", "unknown"),
+            "provider_status": {},
+            "errors": [],
+            "persisted_candles": False,
+            "persisted_backtest_trades": False,
+            "persisted_equity_curves": False,
+        }
     health = {
         "worker_name": "market-scanner",
         "status": "starting",
@@ -489,6 +520,7 @@ async def scan_once(
             "no_setup_evaluations": no_setup_count,
             "alerts_sent": sent,
             "alerts_failed": failed,
+            "telegram_status": telegram_status,
             "provider_status": provider_status,
             "errors": errors,
             "persisted_candles": False,
