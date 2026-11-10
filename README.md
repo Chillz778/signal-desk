@@ -89,6 +89,18 @@ GitHub documents that schedules run from the default branch and may be delayed d
 
 ## API routes
 
+## Publish the dashboard
+
+The repository includes a Render Blueprint for a free Python web service. It serves the dashboard and API together, uses Supabase for compact state, and protects the site with HTTP Basic sign-in. The `/health` route stays public for Render's service check; all dashboard and API routes require the username and password you choose during the first Blueprint setup.
+
+During Blueprint setup, choose the **Free** plan and enter values for `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD`, `TWELVE_DATA_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` in Render's prompt. These values are not stored in this repository. Telegram credentials stay in GitHub Actions because the hourly scanner runs there.
+
+Render's Free web service sleeps after 15 minutes without traffic and can take about a minute to wake. The GitHub scanner remains on its hourly schedule even while the dashboard sleeps. Free hosting is suitable for a personal preview, but it does not provide always-on production availability. See [Render's free service limits](https://render.com/docs/free).
+
+Render Blueprint: [open Signal Desk setup](https://dashboard.render.com/blueprint/new?repo=https%3A%2F%2Fgithub.com%2FChillz778%2Fsignal-desk).
+
+## API routes
+
 - `GET /api/v1/market-data/{instrument}?timeframe=1h&limit=240` — validated candle history.
 - `POST /api/v1/research/backtest` — one cost-aware backtest. Trade details and equity curve are returned only when `include_details` is explicitly true; they remain in memory.
 - `POST /api/v1/research/validate` — in-sample, out-of-sample, and walk-forward validation; writes a compact summary only when Supabase is configured.
