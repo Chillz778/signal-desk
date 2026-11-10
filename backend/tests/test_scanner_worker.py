@@ -97,7 +97,7 @@ class ScannerWorkerTests(unittest.IsolatedAsyncioTestCase):
             now=datetime.now(timezone.utc),
         )
         self.assertEqual(result["status"], "healthy")
-        self.assertEqual(result["scanned_instruments"], 4)
+        self.assertEqual(result["scanned_instruments"], len(INSTRUMENTS))
         self.assertEqual(result["signals_created"], 0)
         self.assertEqual(store.inserted, [])
         self.assertEqual(store.retention_days, 30)
@@ -161,9 +161,9 @@ class ScannerWorkerTests(unittest.IsolatedAsyncioTestCase):
                 now=datetime.now(timezone.utc),
             )
 
-        self.assertEqual(result["signals_created"], 4)
-        self.assertEqual(result["alerts_sent"], 4)
-        self.assertEqual(len(notifier.sent), 4)
+        self.assertEqual(result["signals_created"], len(INSTRUMENTS))
+        self.assertEqual(result["alerts_sent"], len(INSTRUMENTS))
+        self.assertEqual(len(notifier.sent), len(INSTRUMENTS))
         self.assertTrue(all(event["mode"] == "live" for event in store.inserted))
         self.assertTrue(all(event["status"] == "developing" for event in store.inserted))
         self.assertTrue(all(event["signal_data"]["risk_filter_basis"] == "gross_before_costs" for event in store.inserted))

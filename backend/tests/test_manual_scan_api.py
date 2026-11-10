@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
+from app.domain.instruments import INSTRUMENTS
 from app.main import app
 
 
@@ -19,7 +20,7 @@ class ManualScanApiTests(unittest.IsolatedAsyncioTestCase):
 
         result = {
             "status": "healthy",
-            "scanned_instruments": 4,
+            "scanned_instruments": len(INSTRUMENTS),
             "signals_created": 0,
             "duplicate_candidates_suppressed": 0,
             "alerts_sent": 0,
@@ -52,7 +53,7 @@ class ManualScanApiTests(unittest.IsolatedAsyncioTestCase):
                     await asyncio.sleep(0.01)
 
         self.assertEqual(state.json()["status"], "completed")
-        self.assertEqual(state.json()["result"]["scanned_instruments"], 4)
+        self.assertEqual(state.json()["result"]["scanned_instruments"], len(INSTRUMENTS))
         scan.assert_awaited_once()
 
     async def test_manual_scan_rejects_cross_site_request(self) -> None:
