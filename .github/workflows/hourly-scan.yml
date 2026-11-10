@@ -1,0 +1,54 @@
+name: Hourly market scan
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-market-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Validate data and advance paper signals
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SIGNAL_RETENTION_DAYS: "30"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Check required secrets are present
+        run: |
+          python - <<'PY'
+          import os
+          required = ("TWELVE_DATA_API_KEY", "SUPABASE_URL", "SUPABASE_SECRET_KEY")
+          missing = [name for name in required if not os.getenv(name, "").strip()]
+          if missing:
+              raise SystemExit("Add these repository Actions secrets before enabling scans: " + ", ".join(missing))
+          telegram = (os.getenv("TELEGRAM_BOT_TOKEN", "").strip(), os.getenv("TELEGRAM_CHAT_ID", "").strip())
+          if any(telegram) and not all(telegram):
+              raise SystemExit("Set both TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, or leave both empty.")
+          PY
+
+      - name: Install the application
+        run: python -m pip install --disable-pip-version-check -e .
+
+      - name: Run one bounded scan
+        run: python -m app.workers.scanner
