@@ -2,7 +2,7 @@ name: Hourly market scan
 
 "on":
   schedule:
-    - cron: "17 * * * *"
+    - cron: "23 * * * *"
   workflow_dispatch:
 
 permissions:
