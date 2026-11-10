@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   scan:
-    name: Validate data and advance paper signals
+    name: Scan markets and deliver signal alerts
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

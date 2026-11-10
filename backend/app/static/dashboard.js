@@ -243,9 +243,12 @@
     }
   }
 
-  function stateBadge(status) {
+  function stateBadge(entry) {
+    const status = entry?.status || "testing";
+    const forward = entry?.forward_summary || {};
+    const comparison = forward.historical_comparison_status;
     const span = document.createElement("span");
-    span.className = `state-badge ${status || "testing"}`;
+    span.className = `state-badge ${status}`;
     const labels = {
       testing: "Alerts enabled",
       historical_pass_forward_test_required: "Alerts on · monitoring",
@@ -254,8 +257,12 @@
       historical_rejected: "History failed · alerts on",
       insufficient_data: "Needs data · alerts on",
     };
-    span.textContent = labels[status || "testing"] || niceStatus(status);
-    span.title = `Research status: ${niceStatus(status || "testing")}. Signal alerts remain enabled.`;
+    span.textContent = labels[status] || niceStatus(status);
+    if (comparison === "suspended" && status === "testing") span.textContent = "Drift noted · alerts on";
+    if (comparison === "approved_for_live" && status === "testing") span.textContent = "Forward checks pass · alerts on";
+    const outcomes = forward.live_signal_outcomes?.trade_count ?? 0;
+    const reasons = (forward.monitoring_reasons || []).join(", ");
+    span.title = `Research status: ${niceStatus(status)}. Forward comparison: ${comparison || "not compared"}; ${outcomes} completed outcomes${reasons ? `; ${reasons}` : ""}. Signal alerts remain enabled.`;
     return span;
   }
 
@@ -273,7 +280,7 @@
         STRATEGIES.forEach(([key]) => {
           const cell = document.createElement("td");
           const entry = byKey.get(`${instrument}|${key}`);
-          cell.append(stateBadge(entry?.status));
+          cell.append(stateBadge(entry));
           row.append(cell);
         });
         body.append(row);
