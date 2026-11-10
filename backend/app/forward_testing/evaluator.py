@@ -119,7 +119,7 @@ def advance_signal(state: Mapping, candle: Candle) -> dict:
             )
             return updated
 
-        costs = updated.get("signal_data", {}).get("cost_assumptions", {})
+        costs = updated.get("signal_data", {}).get("cost_assumptions") or {}
         impact = _impact_fraction(costs)
         entry = _enter_fill(fill_mid, side, impact)
         stop = float(updated["stop_loss"])
@@ -148,7 +148,7 @@ def advance_signal(state: Mapping, candle: Candle) -> dict:
             realized_r_multiple=0.0,
         )
 
-    costs = updated.get("signal_data", {}).get("cost_assumptions", {})
+    costs = updated.get("signal_data", {}).get("cost_assumptions") or {}
     impact = _impact_fraction(costs)
     side = updated["side"]
     stop = float(updated["stop_loss"])

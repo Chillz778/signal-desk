@@ -48,7 +48,7 @@ def build_signal(
     setup: TradeSetup,
     validation_status: str = "testing",
 ) -> Signal:
-    """Build a candidate; only externally verified approval may mark it confirmed."""
+    """Build a developing signal after strategy confirmation, independent of validation."""
     timeframe = context.execution_timeframe
     execution_history = context.bars_by_timeframe[timeframe]
     entry = context.execution_candle.close
@@ -62,7 +62,6 @@ def build_signal(
         setup.side, entry, setup.stop_loss, setup.targets, weights
     )
     expiry = context.as_of + TIMEFRAME_DURATION[timeframe] * setup.valid_for_bars
-    validation_passed = validation_status == "approved_for_live"
     payload = {
         "instrument": context.instrument,
         "strategy": strategy.name,
@@ -93,7 +92,9 @@ def build_signal(
         confirmations=setup.confirmations,
         invalidation_conditions=setup.invalidation_conditions,
         expires_at=expiry,
-        status="confirmed" if validation_passed else "developing",
+        # ``developing`` means the proposed entry has not filled yet. It does
+        # not mean the setup failed historical or forward validation.
+        status="developing",
         validation_status=validation_status,
-        blocked_reason=None if validation_passed else "Strategy has not passed historical and forward gates.",
+        blocked_reason=None,
     )

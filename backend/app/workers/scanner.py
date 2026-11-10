@@ -18,7 +18,7 @@ from app.domain.instruments import INSTRUMENTS, TIMEFRAME_DURATION
 from app.forward_testing.evaluator import advance_signal
 from app.forward_testing.monitor import compare_forward_to_historical, summarize_forward_results
 from app.notifications.telegram import NotificationError, TelegramNotifier
-from app.risk_management.calculator import net_reward_risk
+from app.risk_management.calculator import net_reward_risk, planned_reward_risk
 from app.signals import build_signal
 from app.strategies import STRATEGY_CLASSES, build_strategy
 from app.backtesting.models import StrategyContext
@@ -26,7 +26,6 @@ from app.backtesting.models import StrategyContext
 logger = logging.getLogger("trading_scanner")
 
 _TERMINAL_STATUSES = {"expired", "invalidated", "completed"}
-_FORWARD_ELIGIBLE = {"historical_pass_forward_test_required", "approved_for_live"}
 _SIGNAL_UPDATES = (
     "status",
     "entry_filled_at",
@@ -62,10 +61,20 @@ def _context_for(instrument: str, series: dict) -> StrategyContext:
     )
 
 
-def _signal_record(signal, setup, mode: str, net_rr: float, costs: dict[str, float]) -> dict:
+def _signal_record(
+    signal,
+    setup,
+    mode: str,
+    reward_risk: float,
+    costs: dict[str, float] | None,
+    *,
+    costs_applied: bool,
+) -> dict:
     signal_data = jsonable_encoder(signal.to_dict())
-    signal_data["net_reward_risk"] = net_rr
+    signal_data["risk_reward_ratio"] = reward_risk
+    signal_data["risk_filter_basis"] = "after_configured_costs" if costs_applied else "gross_before_costs"
     signal_data["cost_assumptions"] = costs
+    signal_data["cost_assumptions_applied"] = costs_applied
     weights = setup.target_weights or tuple(1 / len(setup.targets) for _ in setup.targets)
     return {
         "signal_id": signal.signal_id,
@@ -144,26 +153,12 @@ async def _advance_existing_events(store, events: list[dict], series: dict) -> t
     return updated_events, errors
 
 
-async def _send_pending_alerts(store, notifier, status_by_key) -> tuple[int, int, str]:
+async def _send_pending_alerts(store, notifier) -> tuple[int, int, str]:
     if notifier is None:
         return 0, 0, "not_configured"
     sent = failed = 0
     for event in await store.list_pending_alerts():
         signal_id = event["signal_id"]
-        key = (event["strategy_name"], event["strategy_version"], event["instrument"])
-        approval = status_by_key.get(key, {}).get("status")
-        if approval != "approved_for_live":
-            await store.update_signal(
-                signal_id,
-                {
-                    "status": "invalidated",
-                    "outcome": "invalidated",
-                    "outcome_at": datetime.now(timezone.utc).isoformat(),
-                    "alert_status": "suppressed",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                },
-            )
-            continue
         attempts = int(event.get("alert_attempts", 0)) + 1
         await store.update_signal(
             signal_id,
@@ -200,9 +195,9 @@ async def _send_pending_alerts(store, notifier, status_by_key) -> tuple[int, int
 async def _refresh_forward_status(store, status_rows: list[dict]) -> list[str]:
     errors = []
     for state in status_rows:
-        if state.get("status") not in _FORWARD_ELIGIBLE:
-            continue
         config = state.get("config") or {}
+        if not state.get("historical_summary") and not config.get("signal_only_alerts"):
+            continue
         risk_fraction = float(config.get("risk_fraction", 0.01))
         try:
             paper_events = await store.list_forward_outcomes(
@@ -220,36 +215,46 @@ async def _refresh_forward_status(store, status_rows: list[dict]) -> list[str]:
             paper_summary = summarize_forward_results(paper_events, risk_fraction)
             live_summary = summarize_forward_results(live_events, risk_fraction)
             minimum_trades = int(config.get("minimum_forward_trades", 30))
-            basis = "forward_test"
-            new_status = state["status"]
+            basis = "collecting_live_signal_outcomes"
+            comparison_status = "not_compared"
             reasons: tuple[str, ...] = ()
-            if state["status"] == "historical_pass_forward_test_required":
-                new_status, reasons = compare_forward_to_historical(
-                    state.get("historical_summary") or {},
+            historical_summary = state.get("historical_summary") or {}
+            if (
+                state.get("status") == "historical_pass_forward_test_required"
+                and paper_summary["trade_count"] >= minimum_trades
+            ):
+                basis = "paper_forward_test"
+                comparison_status, reasons = compare_forward_to_historical(
+                    historical_summary,
                     paper_summary,
                     minimum_forward_trades=minimum_trades,
                     minimum_profit_factor=float(config.get("minimum_forward_profit_factor", 1.0)),
                     maximum_drawdown_percent=float(config.get("maximum_forward_drawdown_percent", 25.0)),
                 )
-            elif live_summary["trade_count"] >= minimum_trades:
+            elif live_summary["trade_count"] >= minimum_trades and historical_summary:
                 basis = "live_signal_outcomes"
-                new_status, reasons = compare_forward_to_historical(
-                    state.get("historical_summary") or {},
+                comparison_status, reasons = compare_forward_to_historical(
+                    historical_summary,
                     live_summary,
                     minimum_forward_trades=minimum_trades,
                     minimum_profit_factor=float(config.get("minimum_forward_profit_factor", 1.0)),
                     maximum_drawdown_percent=float(config.get("maximum_forward_drawdown_percent", 25.0)),
                 )
+            elif not historical_summary:
+                reasons = ("historical_validation_not_run",)
+            elif live_summary["trade_count"] < minimum_trades:
+                reasons = ("collecting_live_signal_outcomes",)
             summary = {
                 "paper_forward_test": paper_summary,
                 "live_signal_outcomes": live_summary,
                 "monitoring_basis": basis,
+                "historical_comparison_status": comparison_status,
                 "monitoring_reasons": list(reasons),
+                "alerts_are_gated_by_historical_or_forward_results": False,
             }
             await store.upsert_strategy_status(
                 {
                     **state,
-                    "status": new_status,
                     "forward_summary": summary,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
@@ -267,7 +272,7 @@ async def scan_once(
     notifier: TelegramNotifier | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Scan only historically eligible strategies; persist minimal lifecycle state."""
+    """Alert on each strategy's confirmed setup and persist minimal lifecycle state."""
     provider = provider or TwelveDataProvider.from_environment()
     if store is None:
         store = SupabaseStore.from_environment()
@@ -348,7 +353,8 @@ async def scan_once(
                 errors.append("instrument_scan_failed")
                 logger.exception("Instrument scan failed for %s", instrument.code)
 
-        # Re-evaluate drift after outcomes are processed, before authorizing new alerts.
+        # Keep performance comparisons current; they are informational and never
+        # authorize or suppress a strategy's signal alerts.
         status_errors = await _refresh_forward_status(store, status_rows)
         if status_errors:
             degraded = True
@@ -369,59 +375,96 @@ async def scan_once(
                 strategy = strategy_class()
                 key = (strategy_name, strategy.version, instrument.code)
                 state = status_by_key.get(key)
-                if state is None or state.get("status") not in _FORWARD_ELIGIBLE:
-                    continue
                 if key in active_keys:
                     continue
-                costs = state.get("config") or {}
+                costs = (state or {}).get("config") or {}
                 required_costs = (
                     "spread_bps",
                     "slippage_bps",
                     "commission_bps_per_side",
                 )
-                if any(name not in costs for name in required_costs):
-                    degraded = True
-                    errors.append("strategy_cost_configuration_missing")
-                    continue
                 setup = strategy.evaluate(context)
                 if setup is None:
                     no_setup_count += 1
                     continue
                 try:
-                    net_rr = net_reward_risk(
-                        side=setup.side,
-                        entry=context.execution_candle.close,
-                        stop_loss=setup.stop_loss,
-                        targets=setup.targets,
-                        target_weights=setup.target_weights,
-                        spread_bps=float(costs["spread_bps"]),
-                        slippage_bps=float(costs["slippage_bps"]),
-                        commission_bps_per_side=float(costs["commission_bps_per_side"]),
-                    )
+                    costs_applied = all(name in costs for name in required_costs)
+                    if costs_applied:
+                        reward_risk = net_reward_risk(
+                            side=setup.side,
+                            entry=context.execution_candle.close,
+                            stop_loss=setup.stop_loss,
+                            targets=setup.targets,
+                            target_weights=setup.target_weights,
+                            spread_bps=float(costs["spread_bps"]),
+                            slippage_bps=float(costs["slippage_bps"]),
+                            commission_bps_per_side=float(costs["commission_bps_per_side"]),
+                        )
+                    else:
+                        reward_risk = planned_reward_risk(
+                            setup.side,
+                            context.execution_candle.close,
+                            setup.stop_loss,
+                            setup.targets,
+                            setup.target_weights,
+                        )
                 except (TypeError, ValueError):
                     degraded = True
                     errors.append("strategy_risk_filter_failed")
                     continue
-                if net_rr < float(costs.get("minimum_reward_risk", 2.0)):
+                if reward_risk < float(costs.get("minimum_reward_risk", 2.0)):
                     continue
 
-                mode = "live" if state["status"] == "approved_for_live" else "forward_test"
+                validation_status = state.get("status", "testing") if state else "testing"
                 signal = build_signal(
                     context,
                     strategy,
                     setup,
-                    validation_status=state["status"],
+                    validation_status=validation_status,
                 )
-                record = _signal_record(signal, setup, mode, net_rr, costs)
+                record_costs = (
+                    {name: float(costs[name]) for name in required_costs}
+                    if costs_applied
+                    else None
+                )
+                record = _signal_record(
+                    signal,
+                    setup,
+                    "live",
+                    reward_risk,
+                    record_costs,
+                    costs_applied=costs_applied,
+                )
                 if await store.insert_signal(record):
                     generated += 1
                     active_keys.add(key)
+                    if state is None:
+                        state = {
+                            "strategy_name": strategy_name,
+                            "strategy_version": strategy.version,
+                            "instrument": instrument.code,
+                            "status": "testing",
+                            "historical_summary": {},
+                            "forward_summary": {},
+                            "config": {
+                                "signal_only_alerts": True,
+                                "minimum_reward_risk": 2.0,
+                                "risk_fraction": 0.01,
+                            },
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        try:
+                            await store.upsert_strategy_status(state)
+                        except StorageError:
+                            degraded = True
+                            errors.append("strategy_status_persistence_failed")
+                            logger.exception("Could not save informational strategy monitoring state")
+                        else:
+                            status_by_key[key] = state
                 else:
                     duplicate_count += 1
 
-        sent, failed, telegram_status = await _send_pending_alerts(
-            store, notifier, status_by_key
-        )
+        sent, failed, telegram_status = await _send_pending_alerts(store, notifier)
         if failed:
             degraded = True
             errors.append("telegram_delivery_failed")

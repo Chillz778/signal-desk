@@ -101,8 +101,7 @@ def run_validation(
 
     Strategy parameters are fixed across all windows. Each evaluation window uses
     earlier candles only as warm-up/context, and emits no trades before its start.
-    Passing historical gates only permits paper forward testing; it never approves
-    live alerts by itself.
+    Historical validation is reported as research; it never controls alert delivery.
     """
     if execution_timeframe not in series_by_timeframe:
         raise ValueError("The execution timeframe is missing")
@@ -189,7 +188,7 @@ def run_validation(
         walk_forward=walk,
         live_approval_allowed=False,
         note=(
-            "Historical results are not a guarantee. This report can only qualify a strategy "
-            "for paper forward testing; it does not approve live alerts."
+            "Historical results are not a guarantee. This report is informational; scheduled "
+            "signal alerts do not require historical or forward approval."
         ),
     )

@@ -48,9 +48,9 @@
   function niceStatus(value) {
     return ({
       testing: "Testing",
-      historical_pass_forward_test_required: "Paper forward test",
-      approved_for_live: "Live eligible",
-      suspended: "Suspended",
+      historical_pass_forward_test_required: "Historical pass · outcomes monitoring",
+      approved_for_live: "Historical and forward checked",
+      suspended: "Forward drift noted",
       historical_rejected: "Historical reject",
       insufficient_data: "Need more data",
       healthy: "Healthy",
@@ -246,7 +246,16 @@
   function stateBadge(status) {
     const span = document.createElement("span");
     span.className = `state-badge ${status || "testing"}`;
-    span.textContent = niceStatus(status || "testing");
+    const labels = {
+      testing: "Alerts enabled",
+      historical_pass_forward_test_required: "Alerts on · monitoring",
+      approved_for_live: "Alerts on · history checked",
+      suspended: "Drift noted · alerts on",
+      historical_rejected: "History failed · alerts on",
+      insufficient_data: "Needs data · alerts on",
+    };
+    span.textContent = labels[status || "testing"] || niceStatus(status);
+    span.title = `Research status: ${niceStatus(status || "testing")}. Signal alerts remain enabled.`;
     return span;
   }
 
@@ -293,7 +302,7 @@
     header.append(instrument, direction, status);
     const strategy = document.createElement("p");
     strategy.className = "signal-strategy";
-    strategy.textContent = `${niceStatus(signal.strategy_name)} · ${signal.mode === "live" ? "Live eligible" : "Paper forward test"}`;
+    strategy.textContent = `${niceStatus(signal.strategy_name)} · Signal alert · historical status: ${niceStatus(data.validation_status || "testing")}`;
     const levels = document.createElement("div");
     levels.className = "signal-levels";
     const values = [
@@ -314,7 +323,7 @@
     const detected = document.createElement("span");
     detected.textContent = formatDate(signal.detected_at);
     const alert = document.createElement("span");
-    alert.textContent = signal.mode === "live" ? `Alert: ${niceStatus(signal.alert_status)}` : `Paper · ${niceStatus(signal.alert_status)}`;
+    alert.textContent = signal.mode === "live" ? `Telegram alert: ${niceStatus(signal.alert_status)}` : `Paper · ${niceStatus(signal.alert_status)}`;
     foot.append(detected, alert);
     card.append(header, strategy, levels, foot);
     return card;
@@ -378,7 +387,7 @@
     const title = document.createElement("h3");
     title.textContent = passed ? "Historical gates passed" : insufficient ? "More historical evidence needed" : "Historical gates did not pass";
     const subtitle = document.createElement("p");
-    subtitle.textContent = `${DISPLAY_NAMES[data.instrument]} · ${niceStatus(data.strategy)} v${data.strategy_version} · no live approval from this result`;
+    subtitle.textContent = `${DISPLAY_NAMES[data.instrument]} · ${niceStatus(data.strategy)} v${data.strategy_version} · informational only; alerts stay enabled`;
     text.append(title, subtitle);
     banner.append(symbol, text);
     const cards = document.createElement("div");
@@ -398,7 +407,7 @@
     } else result.append(banner, cards);
     const note = document.createElement("p");
     note.className = "disclaimer";
-    note.textContent = passed ? `This qualifies the strategy for paper forward testing only. Compact summary saved: ${data.validation_summary_persisted ? "yes" : "no"}. Historical results can change and never guarantee future performance.` : `No live alerts are approved. Compact summary saved: ${data.validation_summary_persisted ? "yes" : "no"}. Historical results are not a guarantee.`;
+    note.textContent = `This report does not turn alerts on or off. Compact summary saved: ${data.validation_summary_persisted ? "yes" : "no"}. Historical results are informational and never guarantee future performance.`;
     result.append(note);
   }
 

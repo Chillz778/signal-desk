@@ -61,16 +61,23 @@ class TelegramNotifier:
         lines.extend(
             f"Take profit {index}: {safe(target)}" for index, target in enumerate(targets, start=1)
         )
+        ratio = signal.get("risk_reward_ratio", signal.get("net_reward_risk", signal.get("planned_reward_risk")))
+        if signal.get("risk_filter_basis") == "after_configured_costs":
+            ratio_line = f"Estimated reward/risk after configured costs: {safe(ratio)}:1"
+        else:
+            ratio_line = f"Planned gross reward/risk: {safe(ratio)}:1 (broker costs not included)"
         lines.extend(
             [
-                f"Planned reward/risk: {safe(signal.get('net_reward_risk'))}:1 after costs",
+                ratio_line,
+                f"Historical status: {safe(str(signal.get('validation_status', 'testing')).replace('_', ' '))}",
                 f"Higher-timeframe context: {safe(signal.get('higher_timeframe_bias'))}",
                 f"Detected: {safe(signal.get('detected_at'))}",
                 "Confirmations:",
             ]
         )
         lines.extend(f"• {safe(item)}" for item in confirmations)
-        lines.append("This is an analysis alert, not an executed trade.")
+        lines.append("Historical and forward results are informational and do not gate alerts.")
+        lines.append("This is an analysis alert, not an executed trade or a profit guarantee.")
         if self.dashboard_url:
             lines.append(f'<a href="{safe(self.dashboard_url)}">Open dashboard</a>')
         return "\n".join(lines)

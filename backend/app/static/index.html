@@ -87,16 +87,16 @@
 
         <section class="panel strategy-panel">
           <div class="panel-heading strategy-heading">
-            <div><div class="eyebrow">INDEPENDENT RULE SETS</div><h2>Strategy readiness</h2><p class="muted">Historical pass allows paper forward testing only. Live alerts require further evidence.</p></div>
-            <div class="status-legend"><span><i class="legend-dot testing"></i> Testing</span><span><i class="legend-dot forward"></i> Forward test</span><span><i class="legend-dot live"></i> Live eligible</span><span><i class="legend-dot suspended"></i> Suspended</span></div>
+            <div><div class="eyebrow">INDEPENDENT RULE SETS</div><h2>Strategy monitoring</h2><p class="muted">Alerts are sent when a strategy's own setup and risk rules pass. Historical and forward results are informational and do not block alerts.</p></div>
+            <div class="status-legend"><span><i class="legend-dot testing"></i> Alerts enabled</span><span><i class="legend-dot forward"></i> Results monitored</span><span><i class="legend-dot live"></i> Historical results</span><span><i class="legend-dot suspended"></i> Drift noted</span></div>
           </div>
           <div class="table-scroll"><table class="strategy-table"><thead><tr><th>Market</th><th>Trend following</th><th>Liquidity sweep + MSS</th><th>Breakout retest</th><th>Range mean reversion</th></tr></thead><tbody id="strategy-rows"><tr><td colspan="5" class="table-empty">Loading strategy states…</td></tr></tbody></table></div>
-          <div class="storage-note"><span class="note-icon">i</span><span>Backtest calculations stay temporary. Only compact validation metrics, scanner health, and recent signal lifecycle data are retained.</span></div>
+          <div class="storage-note"><span class="note-icon">i</span><span>The hourly scanner checks every strategy and market. Alerts go out on a valid setup and risk check; they never place orders. When broker costs are unavailable, the 2:1 reward/risk filter uses the gross plan, before costs.</span></div>
         </section>
 
         <section class="panel validation-panel" id="validate">
           <div class="panel-heading validation-title">
-            <div><div class="eyebrow">HISTORICAL RESEARCH</div><h2>Validate a strategy</h2><p class="muted">Chronological in-sample, out-of-sample, and walk-forward checks.</p></div>
+            <div><div class="eyebrow">OPTIONAL HISTORICAL RESEARCH</div><h2>Validate a strategy</h2><p class="muted">Chronological in-sample, out-of-sample, and walk-forward metrics. These checks do not turn alerts on or off.</p></div>
             <span class="no-guarantee">Past performance does not guarantee future results</span>
           </div>
           <form id="validation-form">

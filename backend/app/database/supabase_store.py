@@ -157,7 +157,7 @@ class SupabaseStore:
             params={
                 "select": "signal_id,signal_data,alert_attempts,updated_at,strategy_name,strategy_version,instrument",
                 "mode": "eq.live",
-                "status": "eq.confirmed",
+                "status": "in.(developing,confirmed)",
                 "alert_status": "in.(not_sent,failed)",
                 "alert_attempts": "lt.3",
                 "order": "detected_at.asc",

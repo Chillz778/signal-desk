@@ -19,7 +19,7 @@ class ExampleStrategy:
 
 
 class SignalAndRiskTests(unittest.TestCase):
-    def test_unvalidated_strategy_candidate_is_never_confirmed(self) -> None:
+    def test_unvalidated_candidate_remains_developing_until_entry_fills(self) -> None:
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
         hourly = tuple(
             Candle(start + timedelta(hours=index), 100, 101, 99, 100, 1)
@@ -43,7 +43,7 @@ class SignalAndRiskTests(unittest.TestCase):
         signal = build_signal(context, ExampleStrategy(), setup)
         self.assertEqual(signal.status, "developing")
         self.assertEqual(signal.validation_status, "testing")
-        self.assertIsNotNone(signal.blocked_reason)
+        self.assertIsNone(signal.blocked_reason)
         self.assertEqual(signal.direction, "BUY")
         self.assertGreater(signal.entry_zone_high, signal.entry_zone_low)
         self.assertEqual(signal.expires_at, context.as_of + timedelta(hours=2))

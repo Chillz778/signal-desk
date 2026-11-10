@@ -32,7 +32,7 @@ class SignalEvaluationRequest(BaseModel):
 
 @router.post("/evaluate")
 async def evaluate_signal(request: SignalEvaluationRequest) -> dict:
-    """Return no setup, a rejected candidate, or an unapproved developing signal."""
+    """Return a research-only candidate; this endpoint does not send a Telegram alert."""
     requested_counts, series = await _load_series(request.instrument_code, 120)
     for timeframe, item in series.items():
         if any(issue.code == "MISSING_CANDLES" for issue in item.quality.issues):
@@ -105,6 +105,6 @@ async def evaluate_signal(request: SignalEvaluationRequest) -> dict:
         "decision": "developing",
         "validation_status": "testing",
         "net_reward_risk": net_rr,
-        "message": "Setup passed its technical rules, but the strategy has not passed historical and forward gates.",
+        "message": "This research endpoint does not send an alert. The scheduled scanner can alert on this strategy without historical or forward approval.",
         "signal": signal.to_dict(),
     }

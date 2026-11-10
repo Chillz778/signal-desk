@@ -28,6 +28,23 @@ class SupabaseStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(observed["apikey"], "sb_secret_test-secret")
         self.assertIsNone(observed["authorization"])
 
+    async def test_pending_alerts_include_new_developing_live_signals(self) -> None:
+        observed = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            observed["mode"] = request.url.params.get("mode")
+            observed["status"] = request.url.params.get("status")
+            return httpx.Response(200, json=[])
+
+        store = SupabaseStore(
+            "https://example.supabase.co",
+            "sb_secret_test-secret",
+            transport=httpx.MockTransport(handler),
+        )
+        self.assertEqual(await store.list_pending_alerts(), [])
+        self.assertEqual(observed["mode"], "eq.live")
+        self.assertEqual(observed["status"], "in.(developing,confirmed)")
+
     async def test_failed_write_does_not_echo_secret_or_provider_body(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500, text="internal failure and credential details")

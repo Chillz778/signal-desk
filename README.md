@@ -1,22 +1,22 @@
 # Personal Trading Intelligence Platform
 
-A free, personal research and signal platform for BTC/USD, EUR/USD, XAU/USD, and GBP/USD. It has a Python API, a browser dashboard, four independent strategy rule sets, a cost-aware backtester, historical validation, paper forward testing, and optional Telegram alerts. It never connects to a broker or places orders.
+A free, personal research and signal platform for BTC/USD, EUR/USD, XAU/USD, and GBP/USD. It has a Python API, a browser dashboard, four independent strategy rule sets, a cost-aware backtester, historical validation, forward outcome monitoring, and optional Telegram alerts. It never connects to a broker or places orders.
 
-The principles behind the system are deliberate: each strategy has its own exact confirmation rules and higher-timeframe context; no setup is an acceptable result; and historical performance is never treated as a promise. Forward results are tracked separately and compared with historical results before a strategy can be considered eligible for live alerts.
+The principles behind the system are deliberate: each strategy has its own exact confirmation rules and higher-timeframe context; no setup is an acceptable result; and historical performance is never treated as a promise. Forward results are tracked and compared with historical results, but neither historical nor forward results control whether alerts are sent.
 
 ## What is built
 
 - **Data engine:** Twelve Data OHLC candles are normalized to UTC. The system drops incomplete candles and blocks analysis if data is stale, malformed, or has unexplained gaps. No synthetic or fallback prices are used.
 - **Four strategy families:** Trend following, liquidity sweep plus market structure shift (MSS), breakout/retest, and range-only mean reversion. Their confirmation rules are strategy-specific rather than a universal indicator checklist.
 - **Backtesting and validation:** Causal, in-memory simulation uses completed candles, explicit spreads/slippage/commission, next-candle entries, stop-first handling when an OHLC candle touches stop and target, 70/30 chronological splits, and walk-forward windows.
-- **Paper forward testing:** The scanner advances eligible candidate signals from new closed hourly candles and tracks entry, expiry, partial targets, stop, and net R outcomes with costs.
-- **Drift monitoring:** Historical pass only permits paper forward testing. Forward outcomes are compared with out-of-sample historical expectancy and profit factor. A deteriorating strategy is suspended from new alerts.
+- **Signal lifecycle and forward monitoring:** The hourly scanner sends an alert on detection, then tracks entry, expiry, partial targets, stop, and later outcomes. Strategy-specific confirmation, data-quality checks, and reward/risk filters still apply.
+- **Performance monitoring:** Forward outcomes are compared with out-of-sample historical expectancy and profit factor when both are available. Historical and forward results are informational and never suppress alerts.
 - **Dashboard:** The API serves the dashboard from the same origin. It shows closed-candle charts, provider and worker health, signal lifecycle, strategy readiness, and a historical-validation form.
-- **Telegram:** Optional alert delivery is gated behind historical and forward approval. Alerts are analysis only; there is no order execution.
+- **Telegram:** Optional alert delivery happens as soon as a strategy's own closed-bar setup and risk rules pass. A scan alerts without historical or forward approval. Alerts are analysis only; there is no order execution or profit guarantee.
 
 ## Storage and privacy
 
-Historical candles are fetched for each calculation and held in memory. Backtest trades and equity curves are never written to local storage or Supabase. A validation run may save only compact strategy metrics/configuration so the scanner can remember its research gate. Supabase also holds short-lived signal lifecycle records and one worker-health row. Signal records are removed after the configured retention period (30 days by default). No brokerage trades or credentials are stored.
+Historical candles are fetched for each calculation and held in memory. Backtest trades and equity curves are never written to local storage or Supabase. A validation run may save only compact strategy metrics/configuration for research and comparison. Supabase also holds short-lived signal lifecycle records, compact outcome summaries, and one worker-health row. Signal records are removed after the configured retention period (30 days by default). No brokerage trades or credentials are stored.
 
 The included Supabase migration enables row-level security and grants the app's server-side role only. Keep `SUPABASE_SECRET_KEY` on the API/worker side; never put it in browser JavaScript, a public frontend setting, or a committed file.
 
@@ -59,7 +59,7 @@ python -m unittest discover -s backend/tests -v
 2. Select a market and 1H/4H/1D chart. Dashboard chart requests use closed candles. Refreshing the four market tiles makes four small additional data requests.
 3. Apply the Supabase migration to see worker and signal history persist across runs.
 4. In **Validate a strategy**, enter your own account value, risk percentage, and broker cost estimates. Those fields are required because assumed zero costs or an invented account size would make the results misleading. A validation request uses historical data credits.
-5. A historical pass only starts paper forward testing. It does not approve a live alert. The dashboard labels the stage and the monitor suspends strategies when mature forward results deteriorate.
+5. Historical validation is optional research. The hourly scanner evaluates all configured strategies and sends an alert when one of their own confirmation rules and the reward/risk filter pass. Existing broker cost assumptions are used when configured; otherwise the minimum reward/risk filter uses the gross plan and explicitly marks that broker costs are unknown. Forward outcomes are tracked for comparison but never block alerts.
 
 A short history or few qualifying setups can produce **Need more data**. That is an intentional outcome, not a reason to lower safeguards blindly.
 
