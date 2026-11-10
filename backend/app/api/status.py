@@ -5,6 +5,7 @@ import os
 from fastapi import APIRouter, HTTPException, Query
 
 from app.database.supabase_store import StorageError, SupabaseStore
+from app.domain.instruments import INSTRUMENTS
 from app.strategies import STRATEGY_CLASSES
 
 router = APIRouter(prefix="/api/v1", tags=["status"])
@@ -60,9 +61,8 @@ async def strategy_status() -> dict:
             for row in rows
         }
 
-    instruments = ("BTCUSD", "EURUSD", "XAUUSD", "GBPUSD")
     items = []
-    for instrument in instruments:
+    for instrument in INSTRUMENTS:
         for name, strategy_class in STRATEGY_CLASSES.items():
             strategy = strategy_class()
             row = stored.get((name, strategy.version, instrument))

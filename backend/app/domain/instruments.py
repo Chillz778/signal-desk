@@ -11,13 +11,12 @@ Timeframe = Literal["1h", "4h", "1day"]
 class Instrument:
     code: str
     provider_symbol: str
-    asset_class: Literal["crypto", "forex", "metal"]
+    asset_class: Literal["crypto", "forex"]
 
 
 INSTRUMENTS: dict[str, Instrument] = {
     "BTCUSD": Instrument("BTCUSD", "BTC/USD", "crypto"),
     "EURUSD": Instrument("EURUSD", "EUR/USD", "forex"),
-    "XAUUSD": Instrument("XAUUSD", "XAU/USD", "metal"),
     "GBPUSD": Instrument("GBPUSD", "GBP/USD", "forex"),
 }
 

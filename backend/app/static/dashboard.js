@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const INSTRUMENTS = ["BTCUSD", "EURUSD", "XAUUSD", "GBPUSD"];
-  const DISPLAY_NAMES = { BTCUSD: "BTC / USD", EURUSD: "EUR / USD", XAUUSD: "XAU / USD", GBPUSD: "GBP / USD" };
+  const INSTRUMENTS = ["BTCUSD", "EURUSD", "GBPUSD"];
+  const DISPLAY_NAMES = { BTCUSD: "BTC / USD", EURUSD: "EUR / USD", GBPUSD: "GBP / USD" };
   const TIMEFRAME_NAMES = { "1h": "1H", "4h": "4H", "1day": "1D" };
   const state = { instrument: "BTCUSD", timeframe: "1h", candles: [], quality: null, loading: false };
   const el = (id) => document.getElementById(id);

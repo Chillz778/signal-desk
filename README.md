@@ -1,6 +1,6 @@
 # Personal Trading Intelligence Platform
 
-A free, personal research and signal platform for BTC/USD, EUR/USD, XAU/USD, and GBP/USD. It has a Python API, a browser dashboard, four independent strategy rule sets, a cost-aware backtester, historical validation, forward outcome monitoring, and optional Telegram alerts. It never connects to a broker or places orders.
+A free, personal research and signal platform for BTC/USD, EUR/USD, and GBP/USD. It has a Python API, a browser dashboard, four independent strategy rule sets, a cost-aware backtester, historical validation, forward outcome monitoring, and optional Telegram alerts. It never connects to a broker or places orders.
 
 The principles behind the system are deliberate: each strategy has its own exact confirmation rules and higher-timeframe context; no setup is an acceptable result; and historical performance is never treated as a promise. Forward results are tracked and compared with historical results, but neither historical nor forward results control whether alerts are sent.
 
@@ -56,9 +56,9 @@ python -m unittest discover -s backend/tests -v
 ## Use the dashboard
 
 1. Start the API, then check that the market-data key is shown as configured.
-2. Select a market and 1H/4H/1D chart. Dashboard chart requests use closed candles. Refreshing the four market tiles makes four small additional data requests.
+2. Select a market and 1H/4H/1D chart. Dashboard chart requests use closed candles. Refreshing the three market tiles makes three small additional data requests.
 3. Apply the Supabase migration to see worker and signal history persist across runs.
-4. Use **Run scan now** to trigger an on-demand scan across all four markets and strategies. It checks closed hourly candles and reports when the scan is complete. The scheduled GitHub scan continues to run hourly.
+4. Use **Run scan now** to trigger an on-demand scan across all three markets and strategies. It checks closed hourly candles and reports when the scan is complete. The scheduled GitHub scan continues to run hourly.
 5. Telegram credentials in GitHub Actions are separate from the Render website environment. To receive Telegram alerts from the on-demand button, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` under the Render service's **Environment** settings. Without them, the button still scans and records signals on the dashboard; the scheduled GitHub scan can continue sending alerts with its repository secrets.
 6. The scanner preserves each strategy's independent confirmation rules, checks data quality, and requires at least 2:1 planned reward/risk. If broker cost assumptions are unavailable, that ratio is gross, before fees. Historical and forward results remain informational and do not block alerts.
 
@@ -66,9 +66,9 @@ A short history or few qualifying setups can produce **Need more data**. That is
 
 ## Free market-data limits
 
-The Twelve Data Basic plan currently lists 8 API credits per minute and 800 per day, with free real-time forex and crypto coverage. The scheduled scanner uses 12 candle requests per hourly run across four symbols and three timeframes: about 288 requests in a full day, before dashboard refreshes or manual validation runs. The code throttles scanner requests and does not download data when the scan is not running.
+The Twelve Data Basic plan currently lists 8 API credits per minute and 800 per day, with free real-time forex and crypto coverage. The scheduled scanner uses 9 candle requests per hourly run across three symbols and three timeframes: about 216 requests in a full day, before dashboard refreshes or manual validation runs. The code throttles scanner requests and does not download data when the scan is not running.
 
-Twelve Data lists commodity access on paid tiers, while Basic access explicitly lists forex and crypto. XAU/USD may therefore be unavailable on your free account. The platform does not upgrade, charge, or substitute another source. If gold is denied, leave it disabled for analysis until a verified free source can be added.
+The enabled symbols are BTC/USD (crypto), EUR/USD (forex), and GBP/USD (forex). XAU/USD has been removed because it is a commodity and may not be available on the free Basic plan. The platform does not upgrade, charge, or substitute another source.
 
 The free plan and its coverage can change. Check the current [Twelve Data pricing and quotas](https://twelvedata.com/pricing) and [Basic-plan coverage](https://support.twelvedata.com/en/articles/5335783-trial) before relying on the usage estimate.
 
